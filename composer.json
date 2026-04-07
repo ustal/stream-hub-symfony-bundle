@@ -1,0 +1,44 @@
+{
+  "name": "ustal/stream-hub-symfony-bundle",
+  "description": "Symfony bundle for Stream Hub integration and wiring",
+  "type": "symfony-bundle",
+  "license": "MIT",
+  "require": {
+    "php": "^8.2",
+    "symfony/framework-bundle": "^6.4 || ^7.0",
+    "symfony/dependency-injection": "^6.4 || ^7.0",
+    "symfony/config": "^6.4 || ^7.0",
+    "symfony/yaml": "^6.4 || ^7.0",
+    "symfony/http-kernel": "^6.4 || ^7.0",
+    "symfony/console": "^6.4 || ^7.0",
+    "symfony/cache": "^6.4 || ^7.0",
+    "ustal/stream-hub-core": "^0.3",
+    "ustal/stream-hub-plugins": "^0.1",
+    "ustal/stream-hub-symfony-bridge": "^0.1"
+  },
+  "require-dev": {
+    "phpunit/phpunit": "^10.0",
+    "deptrac/deptrac": "^3.0"
+  },
+  "autoload": {
+    "psr-4": {
+      "Ustal\\StreamHub\\SymfonyBundle\\": "src/"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "Ustal\\StreamHub\\SymfonyBundle\\Tests\\": "tests/"
+    }
+  },
+  "scripts": {
+    "test": "phpunit",
+    "deptrac": "deptrac analyse"
+  },
+  "minimum-stability": "dev",
+  "prefer-stable": true,
+  "extra": {
+    "branch-alias": {
+      "dev-main": "0.1.x-dev"
+    }
+  }
+}

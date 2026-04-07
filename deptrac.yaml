@@ -1,0 +1,53 @@
+deptrac:
+  paths:
+    - ./src
+    - ./tests
+
+  layers:
+    - name: Bundle
+      collectors:
+        - type: classLike
+          value: ^Ustal\\StreamHub\\SymfonyBundle\\(?!Tests\\)
+
+    - name: Tests
+      collectors:
+        - type: classLike
+          value: ^Ustal\\StreamHub\\SymfonyBundle\\Tests\\
+
+    - name: Bridge
+      collectors:
+        - type: classLike
+          value: ^Ustal\\StreamHub\\SymfonyBridge\\
+
+    - name: Plugins
+      collectors:
+        - type: classLike
+          value: ^Ustal\\StreamHub\\Plugins\\
+
+    - name: Core
+      collectors:
+        - type: classLike
+          value: ^Ustal\\StreamHub\\(Component|Core)\\
+
+    - name: External
+      collectors:
+        - type: classLike
+          value: ^(Symfony\\|PHPUnit\\|Twig\\|Psr\\)
+
+  ruleset:
+    Bundle:
+      - Bridge
+      - Plugins
+      - Core
+      - External
+
+    Tests:
+      - Bundle
+      - Bridge
+      - Plugins
+      - Core
+      - External
+
+    Bridge: ~
+    Plugins: ~
+    Core: ~

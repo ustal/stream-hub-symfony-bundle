@@ -1,0 +1,41 @@
+services:
+  _defaults:
+    autowire: true
+    autoconfigure: true
+
+  Ustal\StreamHub\SymfonyBundle\:
+    resource: '../../'
+    exclude:
+      - '../../DependencyInjection/'
+      - '../../Resources/'
+      - '../../Tests/'
+
+  Ustal\StreamHub\SymfonyBundle\StreamHubBundle:
+    public: true
+
+  Ustal\StreamHub\Component\Render\ViewRendererInterface:
+    alias: Ustal\StreamHub\SymfonyBridge\Twig\TwigViewRenderer
+
+  Ustal\StreamHub\Component\Render\WidgetRenderAdapterInterface:
+    alias: Ustal\StreamHub\SymfonyBundle\Render\ContainerWidgetRenderAdapter
+
+  Ustal\StreamHub\SymfonyBridge\Twig\StreamHubTwigExtension:
+    tags:
+      - twig.extension
+
+  Ustal\StreamHub\SymfonyBundle\Render\HtmlRenderHandler:
+    tags:
+      - stream_hub.render_handler
+
+  Ustal\StreamHub\Core\Render\Renderer:
+    arguments:
+      $handlers: !tagged_iterator stream_hub.render_handler
+
+  Ustal\StreamHub\Component\Service\PluginDefinitionBuilder:
+    arguments:
+      $requiredPlugins:
+        - Ustal\StreamHub\Core\Plugins\CoreStream\CoreStreamPlugin
+
+  Ustal\StreamHub\SymfonyBundle\CacheWarmer\StreamHubAssetsWarmer:
+    tags:
+      - kernel.cache_warmer
