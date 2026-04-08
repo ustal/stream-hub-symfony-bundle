@@ -7,18 +7,15 @@ services:
     resource: '../../'
     exclude:
       - '../../Command/'
+      - '../../Context/'
       - '../../DependencyInjection/'
+      - '../../Factory/'
+      - '../../Render/'
       - '../../Resources/'
       - '../../Tests/'
 
   Ustal\StreamHub\SymfonyBundle\StreamHubBundle:
     public: true
-
-  Ustal\StreamHub\Component\Render\ViewRendererInterface:
-    alias: Ustal\StreamHub\SymfonyBridge\Twig\TwigViewRenderer
-
-  Ustal\StreamHub\Component\Render\WidgetRenderAdapterInterface:
-    alias: Ustal\StreamHub\SymfonyBundle\Render\ContainerWidgetRenderAdapter
 
   stream_hub.identifier_generator.random_hex:
     class: Ustal\StreamHub\Component\Identifier\Generator\RandomHexIdentifierGenerator
@@ -29,23 +26,15 @@ services:
   stream_hub.identifier_generator.uuid_v7:
     class: Ustal\StreamHub\Component\Identifier\Generator\UuidV7IdentifierGenerator
 
-  Ustal\StreamHub\SymfonyBridge\Twig\StreamHubTwigExtension:
-    tags:
-      - twig.extension
-
-  Ustal\StreamHub\SymfonyBundle\Render\HtmlRenderHandler:
-    tags:
-      - stream_hub.render_handler
-
-  Ustal\StreamHub\Core\Render\Renderer:
+  Ustal\StreamHub\Core\Command\CommandBusInterface:
+    class: Ustal\StreamHub\Core\Command\CommandBus
     arguments:
-      $handlers: !tagged_iterator stream_hub.render_handler
+      $handlers: !tagged_iterator stream_hub.command_handler
 
-  Ustal\StreamHub\Component\Service\PluginDefinitionBuilder:
+  Ustal\StreamHub\Core\Command\ModelCommandBusInterface:
+    alias: stream_hub.model_command_bus
+
+  stream_hub.model_command_bus:
+    class: Ustal\StreamHub\Core\Command\CommandBus
     arguments:
-      $requiredPlugins:
-        - Ustal\StreamHub\Core\Plugins\CoreStream\CoreStreamPlugin
-
-  Ustal\StreamHub\SymfonyBundle\CacheWarmer\StreamHubAssetsWarmer:
-    tags:
-      - kernel.cache_warmer
+      $handlers: !tagged_iterator stream_hub.model_command_handler
