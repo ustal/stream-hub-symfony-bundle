@@ -7,6 +7,7 @@ use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Definition;
 use Ustal\StreamHub\Component\Storage\StreamBackendInterface;
 use Ustal\StreamHub\Core\Command\CommandBusInterface;
+use Ustal\StreamHub\Core\Command\GuardedCommandBus;
 use Ustal\StreamHub\Core\Command\ModelCommandBusInterface;
 use Ustal\StreamHub\Plugins\MessageComposer\Command\SendMessageCommandHandler;
 use Ustal\StreamHub\Plugins\MessageComposer\Service\MessageEventFactory;
@@ -38,7 +39,12 @@ final class StreamHubExtensionTest extends TestCase
         ]], $container);
 
         $this->assertTrue($container->hasAlias(CommandBusInterface::class) || $container->hasDefinition(CommandBusInterface::class));
+        $this->assertTrue($container->hasDefinition('stream_hub.command_bus.inner'));
         $this->assertTrue($container->hasAlias(ModelCommandBusInterface::class));
+        $this->assertSame(
+            GuardedCommandBus::class,
+            $container->getDefinition(CommandBusInterface::class)->getClass()
+        );
         $this->assertFalse($container->hasDefinition(MessageEventFactory::class));
         $this->assertFalse($container->hasDefinition(SendMessageCommandHandler::class));
     }

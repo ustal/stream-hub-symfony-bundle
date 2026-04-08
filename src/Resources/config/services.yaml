@@ -26,10 +26,16 @@ services:
   stream_hub.identifier_generator.uuid_v7:
     class: Ustal\StreamHub\Component\Identifier\Generator\UuidV7IdentifierGenerator
 
-  Ustal\StreamHub\Core\Command\CommandBusInterface:
+  stream_hub.command_bus.inner:
     class: Ustal\StreamHub\Core\Command\CommandBus
     arguments:
       $handlers: !tagged_iterator stream_hub.command_handler
+
+  Ustal\StreamHub\Core\Command\CommandBusInterface:
+    class: Ustal\StreamHub\Core\Command\GuardedCommandBus
+    arguments:
+      $inner: '@stream_hub.command_bus.inner'
+      $guards: !tagged_iterator stream_hub.command_guard
 
   Ustal\StreamHub\Core\Command\ModelCommandBusInterface:
     alias: stream_hub.model_command_bus

@@ -7,6 +7,7 @@ Thin Symfony wiring for Stream Hub.
 In the `v1` direction this bundle focuses on:
 
 - low-level and feature command bus wiring;
+- guard wiring for high-level feature commands;
 - registration of built-in identifier generators;
 - registration of low-level core handlers;
 - optional registration of feature handlers when their dependencies are configured.
@@ -45,6 +46,19 @@ Built-in generator names:
 - `uuid_v7`
 
 Custom Symfony service ids may also be used instead of a built-in generator name.
+
+## Guards
+
+High-level commands may be protected by tagged guard services. Guards are applied only to the feature bus. The low-level model bus stays unguarded.
+
+Register a guard as a regular Symfony service and tag it with:
+
+```yaml
+services:
+  App\StreamHub\Guard\SendMessageGuard:
+    tags:
+      - { name: stream_hub.command_guard }
+```
 
 ## Development
 
