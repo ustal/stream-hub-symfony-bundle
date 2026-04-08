@@ -14,6 +14,14 @@ In the `v1` direction this bundle focuses on:
 
 It is intentionally not a rendering or asset-integration bundle anymore.
 
+## Main Entry Point
+
+When runtime services are configured, the bundle registers:
+
+- `Ustal\StreamHub\Core\StreamHubInterface`
+
+This is the main application-facing facade. It dispatches high-level commands through the guarded feature bus and exposes read operations such as stream lists and unread counters.
+
 ## Minimal Configuration
 
 ```yaml

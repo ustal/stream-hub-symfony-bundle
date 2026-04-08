@@ -12,10 +12,13 @@ use Symfony\Component\DependencyInjection\Reference;
 use Ustal\StreamHub\Component\Context\StreamContextInterface;
 use Ustal\StreamHub\Component\Storage\StreamBackendInterface;
 use Ustal\StreamHub\Core\Command\ModelCommandBusInterface;
+use Ustal\StreamHub\Core\Command\CommandBusInterface;
 use Ustal\StreamHub\Core\Plugins\CoreStream\Command\AppendStreamEventCommandHandler;
 use Ustal\StreamHub\Core\Plugins\CoreStream\Command\CreateStreamCommandHandler;
 use Ustal\StreamHub\Core\Plugins\CoreStream\Command\JoinStreamCommandHandler;
 use Ustal\StreamHub\Core\Plugins\CoreStream\Command\MarkStreamReadCommandHandler;
+use Ustal\StreamHub\Core\StreamHub;
+use Ustal\StreamHub\Core\StreamHubInterface;
 use Ustal\StreamHub\Plugins\MessageComposer\Command\SendMessageCommandHandler;
 use Ustal\StreamHub\Plugins\MessageComposer\Service\MessageEventFactory;
 
@@ -45,6 +48,7 @@ final class StreamHubExtension extends Extension
             $container->setParameter('stream_hub.backend_service', $config['backend_service']);
             $container->setParameter('stream_hub.context_service', $config['context_service']);
             $this->registerCoreHandlers($container);
+            $this->registerStreamHubFacade($container, $config['backend_service'], $config['context_service']);
             $this->registerMessageComposerServices($container, $config['id_generators']);
         }
     }
@@ -94,6 +98,20 @@ final class StreamHubExtension extends Extension
                 ->addTag('stream_hub.command_handler')
                 ->addTag('stream_hub.model_command_handler'));
         }
+    }
+
+    private function registerStreamHubFacade(ContainerBuilder $container, string $backendService, string $contextService): void
+    {
+        $container->setDefinition(StreamHub::class, (new Definition(StreamHub::class))
+            ->setAutowired(false)
+            ->setAutoconfigured(false)
+            ->setArguments([
+                new Reference(CommandBusInterface::class),
+                new Reference($backendService),
+                new Reference($contextService),
+            ]));
+
+        $container->setAlias(StreamHubInterface::class, new Alias(StreamHub::class, false));
     }
 
     /**
