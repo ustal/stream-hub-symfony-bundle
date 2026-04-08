@@ -50,3 +50,14 @@ services:
 
   Ustal\StreamHub\Core\Plugins\CoreStream\Command\MarkStreamReadCommandHandler:
     tags: ['stream_hub.command_handler']
+
+  Ustal\StreamHub\SymfonyBundle\Command\DebugPluginsCommand:
+    arguments:
+      $pluginManager: '@Ustal\StreamHub\Component\Service\PluginManager'
+    tags: ['console.command']
+
+  Ustal\StreamHub\SymfonyBundle\Command\DebugSlotsCommand:
+    arguments:
+      $slotTree: '@Ustal\StreamHub\Component\Service\SlotTree'
+      $rootSlots: '%stream_hub.root_slots%'
+    tags: ['console.command']

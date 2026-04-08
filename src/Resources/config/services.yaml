@@ -6,6 +6,7 @@ services:
   Ustal\StreamHub\SymfonyBundle\:
     resource: '../../'
     exclude:
+      - '../../Command/'
       - '../../DependencyInjection/'
       - '../../Resources/'
       - '../../Tests/'

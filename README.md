@@ -70,6 +70,17 @@ By default the bundle enables the official starter scaffold:
 - `SidebarScaffoldPlugin`
 - `DialogScaffoldPlugin`
 
+## Debug Commands
+
+When the runtime is configured, the bundle also exposes Symfony console helpers:
+
+```bash
+php bin/console stream-hub:debug:plugins
+php bin/console stream-hub:debug:slots
+```
+
+They print the enabled plugin set, public assets, widget/handler classes, and the slot tree resolved from the configured root slots.
+
 ## Template Overrides
 
 The bundle can also participate in widget template overriding.
