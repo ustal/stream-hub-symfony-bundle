@@ -4,6 +4,10 @@
 
 Thin Symfony wiring for Stream Hub.
 
+This package targets:
+- `stream-hub-core ^1.0`
+- `stream-hub-plugins ^1.0`
+
 In the `v1` direction this bundle focuses on:
 
 - low-level and feature command bus wiring;

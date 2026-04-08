@@ -10,8 +10,8 @@
     "symfony/config": "^6.4 || ^7.0",
     "symfony/yaml": "^6.4 || ^7.0",
     "symfony/console": "^6.4 || ^7.0",
-    "ustal/stream-hub-core": "^0.3",
-    "ustal/stream-hub-plugins": "^0.1"
+    "ustal/stream-hub-core": "^1.0",
+    "ustal/stream-hub-plugins": "^1.0"
   },
   "require-dev": {
     "phpunit/phpunit": "^10.0",
@@ -35,7 +35,7 @@
   "prefer-stable": true,
   "extra": {
     "branch-alias": {
-      "dev-main": "0.1.x-dev"
+      "dev-main": "1.0.x-dev"
     }
   }
 }
