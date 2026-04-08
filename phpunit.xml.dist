@@ -4,7 +4,7 @@
          colors="true"
          failOnRisky="true"
          failOnWarning="true"
-         bootstrap="vendor/autoload.php"
+         bootstrap="tests/bootstrap.php"
 >
     <testsuites>
         <testsuite name="tests">

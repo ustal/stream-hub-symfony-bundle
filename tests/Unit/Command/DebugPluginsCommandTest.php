@@ -32,6 +32,7 @@ final class DebugPluginsCommandTest extends TestCase
             handlerClasses: [FakeCommandHandler::class],
             widgets: [],
             widgetClasses: [FakeRootWidget::class],
+            identifierGeneratorRequirements: ['event_id'],
         ));
 
         $tester = new CommandTester(new DebugPluginsCommand(new PluginManager($registry)));
@@ -47,6 +48,7 @@ final class DebugPluginsCommandTest extends TestCase
         self::assertStringContainsString(FakeDebugPlugin::class, $display);
         self::assertStringContainsString(FakeRootWidget::class, $display);
         self::assertStringContainsString(FakeCommandHandler::class, $display);
+        self::assertStringContainsString('event_id', $display);
         self::assertStringContainsString('required', $display);
         self::assertStringContainsString('configured', $display);
     }

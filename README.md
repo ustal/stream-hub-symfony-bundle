@@ -49,6 +49,7 @@ stream_hub:
     - Ustal\StreamHub\Plugins\DialogScaffold\DialogScaffoldPlugin
   root_slots:
     - main
+  id_generators: {}
 ```
 
 If only one of `backend_service` or `context_service` is configured, the bundle will throw an exception during container loading.
@@ -69,6 +70,39 @@ By default the bundle enables the official starter scaffold:
 - `TwoColumnLayoutPlugin`
 - `SidebarScaffoldPlugin`
 - `DialogScaffoldPlugin`
+
+Optional official plugins can be added through `enabled_plugins`. For example, to enable the message composer widget:
+
+```yaml
+stream_hub:
+  backend_service: app.stream_backend
+  context_service: app.stream_context
+  enabled_plugins:
+    - Ustal\StreamHub\Plugins\TwoColumnLayout\TwoColumnLayoutPlugin
+    - Ustal\StreamHub\Plugins\SidebarScaffold\SidebarScaffoldPlugin
+    - Ustal\StreamHub\Plugins\DialogScaffold\DialogScaffoldPlugin
+    - Ustal\StreamHub\Plugins\MessageComposer\MessageComposerPlugin
+  id_generators:
+    message-composer:
+      event_id: uuid_v7
+```
+
+`MessageComposerPlugin` expects the project context to expose at least:
+
+- `stream_hub.message_composer.stream_id`
+- `stream_hub.message_composer.action_url`
+
+It also uses `StreamContextInterface::getCsrfToken()` for the form token and dispatches message sending through the Stream Hub command bus.
+
+The bundle does not provide identifier-generator defaults for plugins that declare generator requirements. If such a plugin is enabled, the configuration must explicitly map each required key.
+
+Built-in generator names:
+
+- `random_hex`
+- `uuid_v4`
+- `uuid_v7`
+
+Custom service ids may also be used instead of a built-in generator name.
 
 ## Debug Commands
 

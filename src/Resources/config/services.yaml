@@ -20,6 +20,15 @@ services:
   Ustal\StreamHub\Component\Render\WidgetRenderAdapterInterface:
     alias: Ustal\StreamHub\SymfonyBundle\Render\ContainerWidgetRenderAdapter
 
+  stream_hub.identifier_generator.random_hex:
+    class: Ustal\StreamHub\Component\Identifier\Generator\RandomHexIdentifierGenerator
+
+  stream_hub.identifier_generator.uuid_v4:
+    class: Ustal\StreamHub\Component\Identifier\Generator\UuidV4IdentifierGenerator
+
+  stream_hub.identifier_generator.uuid_v7:
+    class: Ustal\StreamHub\Component\Identifier\Generator\UuidV7IdentifierGenerator
+
   Ustal\StreamHub\SymfonyBridge\Twig\StreamHubTwigExtension:
     tags:
       - twig.extension

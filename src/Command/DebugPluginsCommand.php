@@ -28,7 +28,7 @@ final class DebugPluginsCommand extends Command
         $io->text(sprintf('Enabled plugins: %d', count($plugins)));
 
         $table = new Table($output);
-        $table->setHeaders(['Plugin', 'Class', 'Widgets', 'Handlers', 'Assets', 'Flags']);
+        $table->setHeaders(['Plugin', 'Class', 'Widgets', 'Handlers', 'ID Generators', 'Assets', 'Flags']);
 
         foreach ($plugins as $plugin) {
             $assets = $assetsByPlugin[$plugin->id] ?? ['js' => [], 'css' => []];
@@ -38,6 +38,7 @@ final class DebugPluginsCommand extends Command
                 $plugin->class,
                 $this->formatList($plugin->widgetClasses),
                 $this->formatList($plugin->handlerClasses),
+                $this->formatList($plugin->identifierGeneratorRequirements),
                 $this->formatAssets($assets['js'], $assets['css']),
                 $plugin->isDefault ? 'required' : 'configured',
             ]);

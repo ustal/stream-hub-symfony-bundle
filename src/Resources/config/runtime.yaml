@@ -33,6 +33,14 @@ services:
       $registry: '@Ustal\StreamHub\Component\Service\PluginDefinitionRegistry'
       $handlers: !tagged_iterator stream_hub.command_handler
 
+  Ustal\StreamHub\Core\Command\ModelCommandBusInterface:
+    alias: stream_hub.model_command_bus
+
+  stream_hub.model_command_bus:
+    class: Ustal\StreamHub\Core\Command\CommandBus
+    arguments:
+      $handlers: !tagged_iterator stream_hub.model_command_handler
+
   Ustal\StreamHub\Core\Render\SlotRendererInterface:
     alias: Ustal\StreamHub\Core\Render\SlotRenderer
 
@@ -40,16 +48,16 @@ services:
     alias: Ustal\StreamHub\Core\Render\StreamPageRenderer
 
   Ustal\StreamHub\Core\Plugins\CoreStream\Command\CreateStreamCommandHandler:
-    tags: ['stream_hub.command_handler']
+    tags: ['stream_hub.command_handler', 'stream_hub.model_command_handler']
 
   Ustal\StreamHub\Core\Plugins\CoreStream\Command\JoinStreamCommandHandler:
-    tags: ['stream_hub.command_handler']
+    tags: ['stream_hub.command_handler', 'stream_hub.model_command_handler']
 
   Ustal\StreamHub\Core\Plugins\CoreStream\Command\AppendStreamEventCommandHandler:
-    tags: ['stream_hub.command_handler']
+    tags: ['stream_hub.command_handler', 'stream_hub.model_command_handler']
 
   Ustal\StreamHub\Core\Plugins\CoreStream\Command\MarkStreamReadCommandHandler:
-    tags: ['stream_hub.command_handler']
+    tags: ['stream_hub.command_handler', 'stream_hub.model_command_handler']
 
   Ustal\StreamHub\SymfonyBundle\Command\DebugPluginsCommand:
     arguments:
