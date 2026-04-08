@@ -16,11 +16,16 @@ use Ustal\StreamHub\Core\Command\CommandBusInterface;
 use Ustal\StreamHub\Core\Plugins\CoreStream\Command\AppendStreamEventCommandHandler;
 use Ustal\StreamHub\Core\Plugins\CoreStream\Command\CreateStreamCommandHandler;
 use Ustal\StreamHub\Core\Plugins\CoreStream\Command\JoinStreamCommandHandler;
+use Ustal\StreamHub\Core\Plugins\CoreStream\Command\LeaveStreamCommandHandler;
 use Ustal\StreamHub\Core\Plugins\CoreStream\Command\MarkStreamReadCommandHandler;
 use Ustal\StreamHub\Core\StreamHub;
 use Ustal\StreamHub\Core\StreamHubInterface;
 use Ustal\StreamHub\Plugins\MessageComposer\Command\SendMessageCommandHandler;
 use Ustal\StreamHub\Plugins\MessageComposer\Service\MessageEventFactory;
+use Ustal\StreamHub\Plugins\StreamLifecycle\Command\JoinStreamCommandHandler as LifecycleJoinStreamCommandHandler;
+use Ustal\StreamHub\Plugins\StreamLifecycle\Command\StartStreamCommandHandler;
+use Ustal\StreamHub\Plugins\StreamLifecycle\Command\LeaveStreamCommandHandler as LifecycleLeaveStreamCommandHandler;
+use Ustal\StreamHub\Plugins\StreamLifecycle\Service\LifecycleSystemEventFactory;
 
 final class StreamHubExtension extends Extension
 {
@@ -50,6 +55,7 @@ final class StreamHubExtension extends Extension
             $this->registerCoreHandlers($container);
             $this->registerStreamHubFacade($container, $config['backend_service'], $config['context_service']);
             $this->registerMessageComposerServices($container, $config['id_generators']);
+            $this->registerStreamLifecycleServices($container, $config['id_generators']);
         }
     }
 
@@ -89,6 +95,7 @@ final class StreamHubExtension extends Extension
         foreach ([
             CreateStreamCommandHandler::class,
             JoinStreamCommandHandler::class,
+            LeaveStreamCommandHandler::class,
             AppendStreamEventCommandHandler::class,
             MarkStreamReadCommandHandler::class,
         ] as $handlerClass) {
@@ -98,6 +105,54 @@ final class StreamHubExtension extends Extension
                 ->addTag('stream_hub.command_handler')
                 ->addTag('stream_hub.model_command_handler'));
         }
+    }
+
+    /**
+     * @param array<string, array<string, string>> $configuredGenerators
+     */
+    private function registerStreamLifecycleServices(ContainerBuilder $container, array $configuredGenerators): void
+    {
+        if (!isset($configuredGenerators['stream-lifecycle']['system_event_id'])) {
+            return;
+        }
+
+        $container->setAlias(
+            'stream_hub.identifier_generator.stream-lifecycle.system_event_id',
+            new Alias($this->resolveIdentifierGeneratorServiceId($configuredGenerators['stream-lifecycle']['system_event_id']), false)
+        );
+
+        $container->setDefinition(LifecycleSystemEventFactory::class, (new Definition(LifecycleSystemEventFactory::class))
+            ->setAutowired(true)
+            ->setAutoconfigured(true)
+            ->setArguments([
+                new Reference('stream_hub.identifier_generator.stream-lifecycle.system_event_id'),
+            ]));
+
+        $container->setDefinition(StartStreamCommandHandler::class, (new Definition(StartStreamCommandHandler::class))
+            ->setAutowired(true)
+            ->setAutoconfigured(true)
+            ->setArguments([
+                new Reference(ModelCommandBusInterface::class),
+                new Reference(LifecycleSystemEventFactory::class),
+            ])
+            ->addTag('stream_hub.command_handler'));
+
+        $container->setDefinition(LifecycleJoinStreamCommandHandler::class, (new Definition(LifecycleJoinStreamCommandHandler::class))
+            ->setAutowired(true)
+            ->setAutoconfigured(true)
+            ->setArguments([
+                new Reference(ModelCommandBusInterface::class),
+            ])
+            ->addTag('stream_hub.command_handler'));
+
+        $container->setDefinition(LifecycleLeaveStreamCommandHandler::class, (new Definition(LifecycleLeaveStreamCommandHandler::class))
+            ->setAutowired(true)
+            ->setAutoconfigured(true)
+            ->setArguments([
+                new Reference(ModelCommandBusInterface::class),
+                new Reference(LifecycleSystemEventFactory::class),
+            ])
+            ->addTag('stream_hub.command_handler'));
     }
 
     private function registerStreamHubFacade(ContainerBuilder $container, string $backendService, string $contextService): void
@@ -122,6 +177,12 @@ final class StreamHubExtension extends Extension
         if (isset($configuredGenerators['message-composer']) && !isset($configuredGenerators['message-composer']['event_id'])) {
             throw new \InvalidArgumentException(
                 'Module "message-composer" requires identifier generator "event_id". Configure it under stream_hub.id_generators.message-composer.event_id.'
+            );
+        }
+
+        if (isset($configuredGenerators['stream-lifecycle']) && !isset($configuredGenerators['stream-lifecycle']['system_event_id'])) {
+            throw new \InvalidArgumentException(
+                'Module "stream-lifecycle" requires identifier generator "system_event_id". Configure it under stream_hub.id_generators.stream-lifecycle.system_event_id.'
             );
         }
     }

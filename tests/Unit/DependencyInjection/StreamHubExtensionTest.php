@@ -13,6 +13,10 @@ use Ustal\StreamHub\Core\StreamHub;
 use Ustal\StreamHub\Core\StreamHubInterface;
 use Ustal\StreamHub\Plugins\MessageComposer\Command\SendMessageCommandHandler;
 use Ustal\StreamHub\Plugins\MessageComposer\Service\MessageEventFactory;
+use Ustal\StreamHub\Plugins\StreamLifecycle\Command\JoinStreamCommandHandler;
+use Ustal\StreamHub\Plugins\StreamLifecycle\Command\LeaveStreamCommandHandler;
+use Ustal\StreamHub\Plugins\StreamLifecycle\Command\StartStreamCommandHandler;
+use Ustal\StreamHub\Plugins\StreamLifecycle\Service\LifecycleSystemEventFactory;
 use Ustal\StreamHub\SymfonyBundle\DependencyInjection\StreamHubExtension;
 use Ustal\StreamHub\SymfonyBundle\Tests\Fake\InMemoryBackend;
 use Ustal\StreamHub\SymfonyBundle\Tests\Fake\InMemoryContext;
@@ -52,6 +56,10 @@ final class StreamHubExtensionTest extends TestCase
         );
         $this->assertFalse($container->hasDefinition(MessageEventFactory::class));
         $this->assertFalse($container->hasDefinition(SendMessageCommandHandler::class));
+        $this->assertFalse($container->hasDefinition(LifecycleSystemEventFactory::class));
+        $this->assertFalse($container->hasDefinition(StartStreamCommandHandler::class));
+        $this->assertFalse($container->hasDefinition(JoinStreamCommandHandler::class));
+        $this->assertFalse($container->hasDefinition(LeaveStreamCommandHandler::class));
     }
 
     public function testItRegistersMessageComposerServicesWhenGeneratorIsConfigured(): void
@@ -79,6 +87,33 @@ final class StreamHubExtensionTest extends TestCase
         );
     }
 
+    public function testItRegistersStreamLifecycleServicesWhenGeneratorIsConfigured(): void
+    {
+        $container = new ContainerBuilder();
+        $container->setDefinition('app.stream_backend', new Definition(InMemoryBackend::class));
+        $container->setDefinition('app.stream_context', new Definition(InMemoryContext::class));
+
+        (new StreamHubExtension())->load([[
+            'backend_service' => 'app.stream_backend',
+            'context_service' => 'app.stream_context',
+            'id_generators' => [
+                'stream-lifecycle' => [
+                    'system_event_id' => 'uuid_v7',
+                ],
+            ],
+        ]], $container);
+
+        $this->assertTrue($container->hasDefinition(LifecycleSystemEventFactory::class));
+        $this->assertTrue($container->hasDefinition(StartStreamCommandHandler::class));
+        $this->assertTrue($container->hasDefinition(JoinStreamCommandHandler::class));
+        $this->assertTrue($container->hasDefinition(LeaveStreamCommandHandler::class));
+        $this->assertTrue($container->hasAlias('stream_hub.identifier_generator.stream-lifecycle.system_event_id'));
+        $this->assertSame(
+            'stream_hub.identifier_generator.uuid_v7',
+            (string) $container->getAlias('stream_hub.identifier_generator.stream-lifecycle.system_event_id')
+        );
+    }
+
     public function testItRejectsIncompleteMessageComposerGeneratorConfiguration(): void
     {
         $this->expectException(\InvalidArgumentException::class);
@@ -89,6 +124,20 @@ final class StreamHubExtensionTest extends TestCase
         (new StreamHubExtension())->load([[
             'id_generators' => [
                 'message-composer' => [],
+            ],
+        ]], $container);
+    }
+
+    public function testItRejectsIncompleteStreamLifecycleGeneratorConfiguration(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('requires identifier generator "system_event_id"');
+
+        $container = new ContainerBuilder();
+
+        (new StreamHubExtension())->load([[
+            'id_generators' => [
+                'stream-lifecycle' => [],
             ],
         ]], $container);
     }

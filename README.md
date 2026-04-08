@@ -55,6 +55,19 @@ Built-in generator names:
 
 Custom Symfony service ids may also be used instead of a built-in generator name.
 
+## Optional Stream Lifecycle Module Wiring
+
+To enable the lifecycle module handler wiring:
+
+```yaml
+stream_hub:
+  backend_service: app.stream_backend
+  context_service: app.stream_context
+  id_generators:
+    stream-lifecycle:
+      system_event_id: uuid_v7
+```
+
 ## Guards
 
 High-level commands may be protected by tagged guard services. Guards are applied only to the feature bus. The low-level model bus stays unguarded.
@@ -67,6 +80,18 @@ services:
     tags:
       - { name: stream_hub.command_guard }
 ```
+
+## Query Side
+
+The bundle does not try to introduce a storage-agnostic query DSL.
+
+For now the application-facing facade keeps only simple read operations:
+
+- stream list
+- single stream lookup
+- unread counters
+
+Anything more specific than that should stay in the project backend or in project-specific query services.
 
 ## Development
 
