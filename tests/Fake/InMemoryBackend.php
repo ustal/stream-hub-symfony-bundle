@@ -12,14 +12,19 @@ use Ustal\StreamHub\Component\Storage\StreamBackendInterface;
 
 final class InMemoryBackend implements StreamBackendInterface
 {
-    public function createStream(StreamContextInterface $context, array $participants): Stream
+    public function createStream(StreamContextInterface $context, string $streamId, array $participants): Stream
     {
-        return $this->createDefaultStream($participants);
+        return $this->createDefaultStream($participants, $streamId);
     }
 
     public function joinStream(StreamContextInterface $context, string $streamId, StreamParticipant $participant): Stream
     {
         return $this->createDefaultStream([$participant], $streamId);
+    }
+
+    public function leaveStream(StreamContextInterface $context, string $streamId, string $userId, \DateTimeImmutable $leftAt): Stream
+    {
+        return $this->createDefaultStream([], $streamId);
     }
 
     public function getStream(StreamContextInterface $context, string $streamId): ?Stream

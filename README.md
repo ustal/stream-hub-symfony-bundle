@@ -2,99 +2,54 @@
 
 [![CI](https://github.com/ustal/stream-hub-symfony-bundle/actions/workflows/ci.yml/badge.svg)](https://github.com/ustal/stream-hub-symfony-bundle/actions/workflows/ci.yml)
 
-Symfony bundle package for Stream Hub integration.
+Thin Symfony wiring for Stream Hub.
 
-This repository is intended to own Symfony-specific wiring:
+This package targets:
+- `stream-hub-core ^1.0`
+- `stream-hub-plugins ^1.0`
 
-- service registration
-- bundle configuration
-- cache warmers
-- console commands
-- asset integration
-- future framework-level glue for bridge and plugins
+In the `v1` direction this bundle focuses on:
 
-Out of the box, this bundle is opinionated: it depends on the official Stream Hub plugin pack and enables the starter scaffold plugins by default.
+- low-level and feature command bus wiring;
+- guard wiring for high-level feature commands;
+- registration of built-in identifier generators;
+- registration of low-level core handlers;
+- optional registration of feature handlers when their dependencies are configured.
 
-## Base Structure
+It is intentionally not a rendering or asset-integration bundle anymore.
 
-```text
-src/
-  StreamHubBundle.php
-  DependencyInjection/
-  Command/
-  CacheWarmer/
-  Resources/config/
-tests/
-```
+## Main Entry Point
 
-The `bridge` package should stay focused on rendering primitives such as Twig helpers and view renderers. Symfony lifecycle concerns belong here.
+When runtime services are configured, the bundle registers:
+
+- `Ustal\StreamHub\Core\StreamHubInterface`
+
+This is the main application-facing facade. It dispatches high-level commands through the guarded feature bus and exposes read operations such as stream lists and unread counters.
 
 ## Minimal Configuration
-
-The bundle can wire the Stream Hub runtime only when the host application provides both:
-
-- a service implementing `Ustal\StreamHub\Component\Storage\StreamBackendInterface`
-- a service implementing `Ustal\StreamHub\Component\Context\StreamContextInterface`
-
-Example:
 
 ```yaml
 # config/packages/stream_hub.yaml
 stream_hub:
   backend_service: app.stream_backend
   context_service: app.stream_context
-  enabled_plugins:
-    - Ustal\StreamHub\Plugins\TwoColumnLayout\TwoColumnLayoutPlugin
-    - Ustal\StreamHub\Plugins\SidebarScaffold\SidebarScaffoldPlugin
-    - Ustal\StreamHub\Plugins\DialogScaffold\DialogScaffoldPlugin
-  root_slots:
-    - main
   id_generators: {}
 ```
 
-If only one of `backend_service` or `context_service` is configured, the bundle will throw an exception during container loading.
+If only one of `backend_service` or `context_service` is configured, the bundle throws during container loading.
 
-With both services configured, the bundle wires:
+## Optional Message Module Wiring
 
-- `PluginDefinitionRegistry`
-- `SlotTree`
-- `PluginManager`
-- `CommandBusInterface`
-- `SlotRendererInterface`
-- `StreamPageRendererInterface`
-- Twig slot rendering through `render_slot(...)`
-- `TwigViewRenderer` through `ViewRendererInterface`
-
-By default the bundle enables the official starter scaffold:
-
-- `TwoColumnLayoutPlugin`
-- `SidebarScaffoldPlugin`
-- `DialogScaffoldPlugin`
-
-Optional official plugins can be added through `enabled_plugins`. For example, to enable the message composer widget:
+To enable the message module handler wiring:
 
 ```yaml
 stream_hub:
   backend_service: app.stream_backend
   context_service: app.stream_context
-  enabled_plugins:
-    - Ustal\StreamHub\Plugins\TwoColumnLayout\TwoColumnLayoutPlugin
-    - Ustal\StreamHub\Plugins\SidebarScaffold\SidebarScaffoldPlugin
-    - Ustal\StreamHub\Plugins\DialogScaffold\DialogScaffoldPlugin
-    - Ustal\StreamHub\Plugins\MessageComposer\MessageComposerPlugin
   id_generators:
     message-composer:
       event_id: uuid_v7
 ```
-
-`MessageComposerPlugin` expects the project context to expose at least:
-
-- `stream_hub.message_composer.stream_id`
-- `stream_hub.message_composer.action_url`
-
-It also uses `StreamContextInterface::getCsrfToken()` for the form token and dispatches message sending through the Stream Hub command bus.
-
-The bundle does not provide identifier-generator defaults for plugins that declare generator requirements. If such a plugin is enabled, the configuration must explicitly map each required key.
 
 Built-in generator names:
 
@@ -102,24 +57,45 @@ Built-in generator names:
 - `uuid_v4`
 - `uuid_v7`
 
-Custom service ids may also be used instead of a built-in generator name.
+Custom Symfony service ids may also be used instead of a built-in generator name.
 
-## Debug Commands
+## Optional Stream Lifecycle Module Wiring
 
-When the runtime is configured, the bundle also exposes Symfony console helpers:
+To enable the lifecycle module handler wiring:
 
-```bash
-php bin/console stream-hub:debug:plugins
-php bin/console stream-hub:debug:slots
+```yaml
+stream_hub:
+  backend_service: app.stream_backend
+  context_service: app.stream_context
+  id_generators:
+    stream-lifecycle:
+      system_event_id: uuid_v7
 ```
 
-They print the enabled plugin set, public assets, widget/handler classes, and the slot tree resolved from the configured root slots.
+## Guards
 
-## Template Overrides
+High-level commands may be protected by tagged guard services. Guards are applied only to the feature bus. The low-level model bus stays unguarded.
 
-The bundle can also participate in widget template overriding.
+Register a guard as a regular Symfony service and tag it with:
 
-If the consuming Symfony application provides a service implementing `WidgetTemplateResolverInterface`, it will be exposed through the decorated stream context and widgets may use it to override their default template map on a per-project basis.
+```yaml
+services:
+  App\StreamHub\Guard\SendMessageGuard:
+    tags:
+      - { name: stream_hub.command_guard }
+```
+
+## Query Side
+
+The bundle does not try to introduce a storage-agnostic query DSL.
+
+For now the application-facing facade keeps only simple read operations:
+
+- stream list
+- single stream lookup
+- unread counters
+
+Anything more specific than that should stay in the project backend or in project-specific query services.
 
 ## Development
 

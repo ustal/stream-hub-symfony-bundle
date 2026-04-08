@@ -5,22 +5,19 @@ namespace Ustal\StreamHub\SymfonyBundle\Tests\Unit\DependencyInjection;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Definition;
-use Ustal\StreamHub\Component\Context\StreamContextInterface;
-use Ustal\StreamHub\Component\Service\PluginDefinitionRegistry;
-use Ustal\StreamHub\Component\Service\PluginManager;
-use Ustal\StreamHub\Component\Service\SlotTree;
 use Ustal\StreamHub\Component\Storage\StreamBackendInterface;
 use Ustal\StreamHub\Core\Command\CommandBusInterface;
+use Ustal\StreamHub\Core\Command\GuardedCommandBus;
 use Ustal\StreamHub\Core\Command\ModelCommandBusInterface;
-use Ustal\StreamHub\Core\Render\SlotRendererInterface;
-use Ustal\StreamHub\Core\Render\StreamPageRendererInterface;
-use Ustal\StreamHub\Plugins\DialogScaffold\DialogScaffoldPlugin;
+use Ustal\StreamHub\Core\StreamHub;
+use Ustal\StreamHub\Core\StreamHubInterface;
 use Ustal\StreamHub\Plugins\MessageComposer\Command\SendMessageCommandHandler;
-use Ustal\StreamHub\Plugins\MessageComposer\MessageComposerPlugin;
 use Ustal\StreamHub\Plugins\MessageComposer\Service\MessageEventFactory;
-use Ustal\StreamHub\Plugins\SidebarScaffold\SidebarScaffoldPlugin;
+use Ustal\StreamHub\Plugins\StreamLifecycle\Command\JoinStreamCommandHandler;
+use Ustal\StreamHub\Plugins\StreamLifecycle\Command\LeaveStreamCommandHandler;
+use Ustal\StreamHub\Plugins\StreamLifecycle\Command\StartStreamCommandHandler;
+use Ustal\StreamHub\Plugins\StreamLifecycle\Service\LifecycleSystemEventFactory;
 use Ustal\StreamHub\SymfonyBundle\DependencyInjection\StreamHubExtension;
-use Ustal\StreamHub\Plugins\TwoColumnLayout\TwoColumnLayoutPlugin;
 use Ustal\StreamHub\SymfonyBundle\Tests\Fake\InMemoryBackend;
 use Ustal\StreamHub\SymfonyBundle\Tests\Fake\InMemoryContext;
 
@@ -33,20 +30,10 @@ final class StreamHubExtensionTest extends TestCase
 
         $extension->load([], $container);
 
-        $this->assertSame('stream-hub', $container->getParameter('stream_hub.assets.public_prefix'));
-        $this->assertSame(
-            [
-                TwoColumnLayoutPlugin::class,
-                SidebarScaffoldPlugin::class,
-                DialogScaffoldPlugin::class,
-            ],
-            $container->getParameter('stream_hub.enabled_plugins')
-        );
-        $this->assertSame(['main'], $container->getParameter('stream_hub.root_slots'));
         $this->assertSame([], $container->getParameter('stream_hub.id_generators'));
     }
 
-    public function testItLoadsRuntimeAliasesWhenBackendAndContextServicesAreConfigured(): void
+    public function testItLoadsRuntimeServicesWhenBackendAndContextServicesAreConfigured(): void
     {
         $container = new ContainerBuilder();
         $container->setDefinition('app.stream_backend', new Definition(InMemoryBackend::class));
@@ -57,25 +44,25 @@ final class StreamHubExtensionTest extends TestCase
             'context_service' => 'app.stream_context',
         ]], $container);
 
-        $this->assertTrue($container->hasAlias(StreamBackendInterface::class));
-        $this->assertTrue($container->hasAlias(StreamContextInterface::class));
-        $this->assertSame('%stream_hub.backend_service%', (string) $container->getAlias(StreamBackendInterface::class));
-        $this->assertSame(
-            'Ustal\\StreamHub\\SymfonyBundle\\Context\\ViewAwareStreamContext',
-            (string) $container->getAlias(StreamContextInterface::class)
-        );
-        $this->assertTrue($container->hasDefinition(PluginDefinitionRegistry::class));
-        $this->assertTrue($container->hasDefinition(SlotTree::class));
-        $this->assertTrue($container->hasDefinition(PluginManager::class));
-        $this->assertTrue($container->hasDefinition(CommandBusInterface::class));
+        $this->assertTrue($container->hasAlias(CommandBusInterface::class) || $container->hasDefinition(CommandBusInterface::class));
+        $this->assertTrue($container->hasDefinition('stream_hub.command_bus.inner'));
         $this->assertTrue($container->hasAlias(ModelCommandBusInterface::class));
-        $this->assertTrue($container->hasAlias(SlotRendererInterface::class));
-        $this->assertTrue($container->hasAlias(StreamPageRendererInterface::class));
+        $this->assertTrue($container->hasDefinition(StreamHub::class));
+        $this->assertTrue($container->hasAlias(StreamHubInterface::class));
+        $this->assertSame(StreamHub::class, (string) $container->getAlias(StreamHubInterface::class));
+        $this->assertSame(
+            GuardedCommandBus::class,
+            $container->getDefinition(CommandBusInterface::class)->getClass()
+        );
         $this->assertFalse($container->hasDefinition(MessageEventFactory::class));
         $this->assertFalse($container->hasDefinition(SendMessageCommandHandler::class));
+        $this->assertFalse($container->hasDefinition(LifecycleSystemEventFactory::class));
+        $this->assertFalse($container->hasDefinition(StartStreamCommandHandler::class));
+        $this->assertFalse($container->hasDefinition(JoinStreamCommandHandler::class));
+        $this->assertFalse($container->hasDefinition(LeaveStreamCommandHandler::class));
     }
 
-    public function testItRegistersMessageComposerServicesOnlyWhenPluginIsEnabled(): void
+    public function testItRegistersMessageComposerServicesWhenGeneratorIsConfigured(): void
     {
         $container = new ContainerBuilder();
         $container->setDefinition('app.stream_backend', new Definition(InMemoryBackend::class));
@@ -84,13 +71,8 @@ final class StreamHubExtensionTest extends TestCase
         (new StreamHubExtension())->load([[
             'backend_service' => 'app.stream_backend',
             'context_service' => 'app.stream_context',
-            'enabled_plugins' => [
-                TwoColumnLayoutPlugin::class,
-                DialogScaffoldPlugin::class,
-                MessageComposerPlugin::class,
-            ],
             'id_generators' => [
-                MessageComposerPlugin::getName() => [
+                'message-composer' => [
                     'event_id' => 'uuid_v7',
                 ],
             ],
@@ -105,7 +87,34 @@ final class StreamHubExtensionTest extends TestCase
         );
     }
 
-    public function testItRejectsEnabledPluginsWithMissingIdentifierGeneratorConfiguration(): void
+    public function testItRegistersStreamLifecycleServicesWhenGeneratorIsConfigured(): void
+    {
+        $container = new ContainerBuilder();
+        $container->setDefinition('app.stream_backend', new Definition(InMemoryBackend::class));
+        $container->setDefinition('app.stream_context', new Definition(InMemoryContext::class));
+
+        (new StreamHubExtension())->load([[
+            'backend_service' => 'app.stream_backend',
+            'context_service' => 'app.stream_context',
+            'id_generators' => [
+                'stream-lifecycle' => [
+                    'system_event_id' => 'uuid_v7',
+                ],
+            ],
+        ]], $container);
+
+        $this->assertTrue($container->hasDefinition(LifecycleSystemEventFactory::class));
+        $this->assertTrue($container->hasDefinition(StartStreamCommandHandler::class));
+        $this->assertTrue($container->hasDefinition(JoinStreamCommandHandler::class));
+        $this->assertTrue($container->hasDefinition(LeaveStreamCommandHandler::class));
+        $this->assertTrue($container->hasAlias('stream_hub.identifier_generator.stream-lifecycle.system_event_id'));
+        $this->assertSame(
+            'stream_hub.identifier_generator.uuid_v7',
+            (string) $container->getAlias('stream_hub.identifier_generator.stream-lifecycle.system_event_id')
+        );
+    }
+
+    public function testItRejectsIncompleteMessageComposerGeneratorConfiguration(): void
     {
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('requires identifier generator "event_id"');
@@ -113,8 +122,22 @@ final class StreamHubExtensionTest extends TestCase
         $container = new ContainerBuilder();
 
         (new StreamHubExtension())->load([[
-            'enabled_plugins' => [
-                MessageComposerPlugin::class,
+            'id_generators' => [
+                'message-composer' => [],
+            ],
+        ]], $container);
+    }
+
+    public function testItRejectsIncompleteStreamLifecycleGeneratorConfiguration(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('requires identifier generator "system_event_id"');
+
+        $container = new ContainerBuilder();
+
+        (new StreamHubExtension())->load([[
+            'id_generators' => [
+                'stream-lifecycle' => [],
             ],
         ]], $container);
     }
