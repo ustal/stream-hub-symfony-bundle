@@ -282,6 +282,7 @@ final class StreamHubExtension extends Extension
 
         $prefix = $this->instancePrefix($instanceName);
         $generatorAliasId = $prefix . '.identifier_generator.stream-lifecycle.system_event_id';
+        $streamIdGeneratorAliasId = $prefix . '.identifier_generator.stream-lifecycle.stream_id';
         $factoryServiceId = $prefix . '.stream_lifecycle.lifecycle_system_event_factory';
         $startHandlerServiceId = $prefix . '.stream_lifecycle.start_stream_handler';
         $joinHandlerServiceId = $prefix . '.stream_lifecycle.join_stream_handler';
@@ -308,6 +309,16 @@ final class StreamHubExtension extends Extension
             ])
             ->addTag($commandHandlerTag));
 
+        if (isset($configuredGenerators['stream-lifecycle']['stream_id'])) {
+            $container->setAlias(
+                $streamIdGeneratorAliasId,
+                new Alias($this->resolveIdentifierGeneratorServiceId($configuredGenerators['stream-lifecycle']['stream_id']), false)
+            );
+
+            $container->getDefinition($startHandlerServiceId)
+                ->addMethodCall('setStreamIdGenerator', [new Reference($streamIdGeneratorAliasId)]);
+        }
+
         $container->setDefinition($joinHandlerServiceId, (new Definition(LifecycleJoinStreamCommandHandler::class))
             ->setAutowired(false)
             ->setAutoconfigured(false)
@@ -327,6 +338,9 @@ final class StreamHubExtension extends Extension
 
         if ($instanceName === 'default') {
             $container->setAlias('stream_hub.identifier_generator.stream-lifecycle.system_event_id', new Alias($generatorAliasId, false));
+            if (isset($configuredGenerators['stream-lifecycle']['stream_id'])) {
+                $container->setAlias('stream_hub.identifier_generator.stream-lifecycle.stream_id', new Alias($streamIdGeneratorAliasId, false));
+            }
             $container->setAlias(LifecycleSystemEventFactory::class, new Alias($factoryServiceId, false));
             $container->setAlias(StartStreamCommandHandler::class, new Alias($startHandlerServiceId, false));
             $container->setAlias(LifecycleJoinStreamCommandHandler::class, new Alias($joinHandlerServiceId, false));

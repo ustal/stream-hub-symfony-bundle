@@ -138,7 +138,11 @@ stream_hub:
   id_generators:
     stream-lifecycle:
       system_event_id: uuid_v7
+      stream_id: uuid_v7 # optional
 ```
+
+`system_event_id` is required for the lifecycle module.
+`stream_id` is optional and is used by `StartStreamCommandHandler` when the application wants the module to generate stream identifiers itself.
 
 ## Guards
 
