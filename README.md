@@ -20,11 +20,14 @@ It is intentionally not a rendering or asset-integration bundle anymore.
 
 ## Main Entry Point
 
-When runtime services are configured, the bundle registers:
+The bundle registers:
 
+- `Ustal\StreamHub\SymfonyBundle\Registry\StreamHubRegistry`
 - `Ustal\StreamHub\Core\StreamHubInterface`
 
-This is the main application-facing facade. It dispatches high-level commands through the guarded feature bus and exposes read operations such as stream lists and unread counters.
+`StreamHubRegistry` is the preferred application-facing entry point.
+
+`StreamHubInterface` remains as a backward-compatible alias to the `default` instance only.
 
 ## Minimal Configuration
 
@@ -37,6 +40,71 @@ stream_hub:
 ```
 
 If only one of `backend_service` or `context_service` is configured, the bundle throws during container loading.
+
+This legacy root-level configuration is treated as the `default` Stream Hub instance.
+
+## Named Instances
+
+The bundle also supports multiple named instances:
+
+```yaml
+stream_hub:
+  backend_service: app.default_stream_backend
+  context_service: app.default_stream_context
+
+  instances:
+    audit:
+      backend_service: app.audit_stream_backend
+      context_service: app.audit_stream_context
+      id_generators:
+        stream-lifecycle:
+          system_event_id: uuid_v7
+```
+
+Generated service ids:
+
+- `stream_hub.instance.default.stream_hub`
+- `stream_hub.instance.audit.stream_hub`
+
+Recommended usage:
+
+```php
+use Ustal\StreamHub\SymfonyBundle\Registry\StreamHubRegistry;
+
+final class AuditController
+{
+    public function __construct(
+        private readonly StreamHubRegistry $streamHubs,
+    ) {}
+
+    public function __invoke(): void
+    {
+        $default = $this->streamHubs->get();
+        $audit = $this->streamHubs->get('audit');
+    }
+}
+```
+
+Instance services are internal implementation details. For multi-instance applications, inject the registry and resolve the needed Stream Hub explicitly.
+
+The legacy aliases still point to the `default` instance:
+
+- `Ustal\StreamHub\Core\StreamHubInterface`
+- `Ustal\StreamHub\Core\Command\CommandBusInterface`
+- `Ustal\StreamHub\Core\Command\ModelCommandBusInterface`
+
+This means existing single-instance applications continue to work without changes:
+
+```php
+use Ustal\StreamHub\Core\StreamHubInterface;
+
+final class LegacyController
+{
+    public function __construct(
+        private readonly StreamHubInterface $streamHub,
+    ) {}
+}
+```
 
 ## Optional Message Module Wiring
 
