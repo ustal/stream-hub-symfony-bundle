@@ -5,7 +5,6 @@ namespace Ustal\StreamHub\SymfonyBundle\Tests\Unit\DependencyInjection;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Definition;
-use Ustal\StreamHub\Component\Storage\StreamBackendInterface;
 use Ustal\StreamHub\Core\Command\CommandBusInterface;
 use Ustal\StreamHub\Core\Command\GuardedCommandBus;
 use Ustal\StreamHub\Core\Command\ModelCommandBusInterface;
@@ -18,6 +17,7 @@ use Ustal\StreamHub\Plugins\StreamLifecycle\Command\LeaveStreamCommandHandler;
 use Ustal\StreamHub\Plugins\StreamLifecycle\Command\StartStreamCommandHandler;
 use Ustal\StreamHub\Plugins\StreamLifecycle\Service\LifecycleSystemEventFactory;
 use Ustal\StreamHub\SymfonyBundle\DependencyInjection\StreamHubExtension;
+use Ustal\StreamHub\SymfonyBundle\Registry\StreamHubRegistry;
 use Ustal\StreamHub\SymfonyBundle\Tests\Fake\InMemoryBackend;
 use Ustal\StreamHub\SymfonyBundle\Tests\Fake\InMemoryContext;
 
@@ -31,9 +31,11 @@ final class StreamHubExtensionTest extends TestCase
         $extension->load([], $container);
 
         $this->assertSame([], $container->getParameter('stream_hub.id_generators'));
+        $this->assertTrue($container->hasDefinition(StreamHubRegistry::class));
+        $this->assertFalse($container->hasAlias(StreamHubInterface::class));
     }
 
-    public function testItLoadsRuntimeServicesWhenBackendAndContextServicesAreConfigured(): void
+    public function testLegacyRootConfigurationRegistersDefaultInstanceAndLegacyAliases(): void
     {
         $container = new ContainerBuilder();
         $container->setDefinition('app.stream_backend', new Definition(InMemoryBackend::class));
@@ -44,15 +46,21 @@ final class StreamHubExtensionTest extends TestCase
             'context_service' => 'app.stream_context',
         ]], $container);
 
-        $this->assertTrue($container->hasAlias(CommandBusInterface::class) || $container->hasDefinition(CommandBusInterface::class));
-        $this->assertTrue($container->hasDefinition('stream_hub.command_bus.inner'));
+        $this->assertTrue($container->hasDefinition('stream_hub.instance.default.command_bus.inner'));
+        $this->assertTrue($container->hasDefinition('stream_hub.instance.default.command_bus'));
+        $this->assertTrue($container->hasDefinition('stream_hub.instance.default.model_command_bus'));
+        $this->assertTrue($container->hasDefinition('stream_hub.instance.default.stream_hub'));
+        $this->assertTrue($container->hasAlias(CommandBusInterface::class));
         $this->assertTrue($container->hasAlias(ModelCommandBusInterface::class));
-        $this->assertTrue($container->hasDefinition(StreamHub::class));
         $this->assertTrue($container->hasAlias(StreamHubInterface::class));
-        $this->assertSame(StreamHub::class, (string) $container->getAlias(StreamHubInterface::class));
+        $this->assertTrue($container->hasAlias(StreamHub::class));
         $this->assertSame(
             GuardedCommandBus::class,
-            $container->getDefinition(CommandBusInterface::class)->getClass()
+            $container->getDefinition('stream_hub.instance.default.command_bus')->getClass()
+        );
+        $this->assertSame(
+            'stream_hub.instance.default.stream_hub',
+            (string) $container->getAlias(StreamHubInterface::class)
         );
         $this->assertFalse($container->hasDefinition(MessageEventFactory::class));
         $this->assertFalse($container->hasDefinition(SendMessageCommandHandler::class));
@@ -62,7 +70,34 @@ final class StreamHubExtensionTest extends TestCase
         $this->assertFalse($container->hasDefinition(LeaveStreamCommandHandler::class));
     }
 
-    public function testItRegistersMessageComposerServicesWhenGeneratorIsConfigured(): void
+    public function testItRegistersNamedInstancesWithoutOverwritingLegacyAliases(): void
+    {
+        $container = new ContainerBuilder();
+        $container->setDefinition('app.default_backend', new Definition(InMemoryBackend::class));
+        $container->setDefinition('app.default_context', new Definition(InMemoryContext::class));
+        $container->setDefinition('app.audit_backend', new Definition(InMemoryBackend::class));
+        $container->setDefinition('app.audit_context', new Definition(InMemoryContext::class));
+
+        (new StreamHubExtension())->load([[
+            'backend_service' => 'app.default_backend',
+            'context_service' => 'app.default_context',
+            'instances' => [
+                'audit' => [
+                    'backend_service' => 'app.audit_backend',
+                    'context_service' => 'app.audit_context',
+                ],
+            ],
+        ]], $container);
+
+        $this->assertTrue($container->hasDefinition('stream_hub.instance.default.stream_hub'));
+        $this->assertTrue($container->hasDefinition('stream_hub.instance.audit.stream_hub'));
+        $this->assertSame(
+            'stream_hub.instance.default.stream_hub',
+            (string) $container->getAlias(StreamHubInterface::class)
+        );
+    }
+
+    public function testItRegistersMessageComposerServicesForDefaultInstanceWhenGeneratorIsConfigured(): void
     {
         $container = new ContainerBuilder();
         $container->setDefinition('app.stream_backend', new Definition(InMemoryBackend::class));
@@ -78,39 +113,43 @@ final class StreamHubExtensionTest extends TestCase
             ],
         ]], $container);
 
-        $this->assertTrue($container->hasDefinition(MessageEventFactory::class));
-        $this->assertTrue($container->hasDefinition(SendMessageCommandHandler::class));
+        $this->assertTrue($container->hasAlias(MessageEventFactory::class));
+        $this->assertTrue($container->hasAlias(SendMessageCommandHandler::class));
         $this->assertTrue($container->hasAlias('stream_hub.identifier_generator.message-composer.event_id'));
         $this->assertSame(
-            'stream_hub.identifier_generator.uuid_v7',
+            'stream_hub.instance.default.identifier_generator.message-composer.event_id',
             (string) $container->getAlias('stream_hub.identifier_generator.message-composer.event_id')
         );
     }
 
-    public function testItRegistersStreamLifecycleServicesWhenGeneratorIsConfigured(): void
+    public function testItRegistersStreamLifecycleServicesForNamedInstanceWhenGeneratorIsConfigured(): void
     {
         $container = new ContainerBuilder();
         $container->setDefinition('app.stream_backend', new Definition(InMemoryBackend::class));
         $container->setDefinition('app.stream_context', new Definition(InMemoryContext::class));
 
         (new StreamHubExtension())->load([[
-            'backend_service' => 'app.stream_backend',
-            'context_service' => 'app.stream_context',
-            'id_generators' => [
-                'stream-lifecycle' => [
-                    'system_event_id' => 'uuid_v7',
+            'instances' => [
+                'audit' => [
+                    'backend_service' => 'app.stream_backend',
+                    'context_service' => 'app.stream_context',
+                    'id_generators' => [
+                        'stream-lifecycle' => [
+                            'system_event_id' => 'uuid_v7',
+                        ],
+                    ],
                 ],
             ],
         ]], $container);
 
-        $this->assertTrue($container->hasDefinition(LifecycleSystemEventFactory::class));
-        $this->assertTrue($container->hasDefinition(StartStreamCommandHandler::class));
-        $this->assertTrue($container->hasDefinition(JoinStreamCommandHandler::class));
-        $this->assertTrue($container->hasDefinition(LeaveStreamCommandHandler::class));
-        $this->assertTrue($container->hasAlias('stream_hub.identifier_generator.stream-lifecycle.system_event_id'));
+        $this->assertTrue($container->hasDefinition('stream_hub.instance.audit.stream_lifecycle.lifecycle_system_event_factory'));
+        $this->assertTrue($container->hasDefinition('stream_hub.instance.audit.stream_lifecycle.start_stream_handler'));
+        $this->assertTrue($container->hasDefinition('stream_hub.instance.audit.stream_lifecycle.join_stream_handler'));
+        $this->assertTrue($container->hasDefinition('stream_hub.instance.audit.stream_lifecycle.leave_stream_handler'));
+        $this->assertTrue($container->hasAlias('stream_hub.instance.audit.identifier_generator.stream-lifecycle.system_event_id'));
         $this->assertSame(
             'stream_hub.identifier_generator.uuid_v7',
-            (string) $container->getAlias('stream_hub.identifier_generator.stream-lifecycle.system_event_id')
+            (string) $container->getAlias('stream_hub.instance.audit.identifier_generator.stream-lifecycle.system_event_id')
         );
     }
 
@@ -136,8 +175,12 @@ final class StreamHubExtensionTest extends TestCase
         $container = new ContainerBuilder();
 
         (new StreamHubExtension())->load([[
-            'id_generators' => [
-                'stream-lifecycle' => [],
+            'instances' => [
+                'audit' => [
+                    'id_generators' => [
+                        'stream-lifecycle' => [],
+                    ],
+                ],
             ],
         ]], $container);
     }
@@ -145,10 +188,27 @@ final class StreamHubExtensionTest extends TestCase
     public function testItRejectsPartialRuntimeConfiguration(): void
     {
         $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('must be configured together');
+        $this->expectExceptionMessage('must configure both backend_service and context_service together');
 
         (new StreamHubExtension())->load([[
             'backend_service' => 'app.stream_backend',
+        ]], new ContainerBuilder());
+    }
+
+    public function testItRejectsDoubleDefaultConfiguration(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('cannot be configured both at the root level');
+
+        (new StreamHubExtension())->load([[
+            'backend_service' => 'app.stream_backend',
+            'context_service' => 'app.stream_context',
+            'instances' => [
+                'default' => [
+                    'backend_service' => 'app.other_backend',
+                    'context_service' => 'app.other_context',
+                ],
+            ],
         ]], new ContainerBuilder());
     }
 }
