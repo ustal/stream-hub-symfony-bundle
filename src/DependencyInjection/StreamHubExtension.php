@@ -178,7 +178,13 @@ final class StreamHubExtension extends Extension
                 new TaggedIteratorArgument($modelCommandHandlerTag),
             ]));
 
-        $this->registerCoreHandlers($container, $instanceName, $commandHandlerTag, $modelCommandHandlerTag);
+        $this->registerCoreHandlers(
+            $container,
+            $instanceName,
+            $instanceConfig['backend_service'],
+            $commandHandlerTag,
+            $modelCommandHandlerTag
+        );
         $this->registerStreamHubFacade($container, $instanceName, $instanceConfig['backend_service'], $instanceConfig['context_service']);
         $this->registerMessageComposerServices($container, $instanceName, $instanceConfig['id_generators'], $commandHandlerTag);
         $this->registerStreamLifecycleServices($container, $instanceName, $instanceConfig['id_generators'], $commandHandlerTag);
@@ -251,7 +257,13 @@ final class StreamHubExtension extends Extension
         }
     }
 
-    private function registerCoreHandlers(ContainerBuilder $container, string $instanceName, string $commandHandlerTag, string $modelCommandHandlerTag): void
+    private function registerCoreHandlers(
+        ContainerBuilder $container,
+        string $instanceName,
+        string $backendService,
+        string $commandHandlerTag,
+        string $modelCommandHandlerTag,
+    ): void
     {
         $prefix = $this->instancePrefix($instanceName) . '.core_handler';
 
@@ -267,8 +279,11 @@ final class StreamHubExtension extends Extension
             $serviceId = $prefix . '.' . $suffix;
 
             $container->setDefinition($serviceId, (new Definition($handlerClass))
-                ->setAutowired(true)
+                ->setAutowired(false)
                 ->setAutoconfigured(false)
+                ->setArguments([
+                    new Reference($backendService),
+                ])
                 ->addTag($commandHandlerTag)
                 ->addTag($modelCommandHandlerTag));
         }

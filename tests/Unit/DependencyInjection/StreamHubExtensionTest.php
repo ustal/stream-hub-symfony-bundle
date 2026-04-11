@@ -12,6 +12,7 @@ use Ustal\StreamHub\Core\StreamHub;
 use Ustal\StreamHub\Core\StreamHubInterface;
 use Ustal\StreamHub\Plugins\MessageComposer\Command\SendMessageCommandHandler;
 use Ustal\StreamHub\Plugins\MessageComposer\Service\MessageEventFactory;
+use Ustal\StreamHub\Plugins\StreamLifecycle\Command\StartStreamCommand;
 use Ustal\StreamHub\Plugins\StreamLifecycle\Command\JoinStreamCommandHandler;
 use Ustal\StreamHub\Plugins\StreamLifecycle\Command\LeaveStreamCommandHandler;
 use Ustal\StreamHub\Plugins\StreamLifecycle\Command\StartStreamCommandHandler;
@@ -73,10 +74,10 @@ final class StreamHubExtensionTest extends TestCase
     public function testItRegistersNamedInstancesWithoutOverwritingLegacyAliases(): void
     {
         $container = new ContainerBuilder();
-        $container->setDefinition('app.default_backend', new Definition(InMemoryBackend::class));
-        $container->setDefinition('app.default_context', new Definition(InMemoryContext::class));
-        $container->setDefinition('app.audit_backend', new Definition(InMemoryBackend::class));
-        $container->setDefinition('app.audit_context', new Definition(InMemoryContext::class));
+        $container->setDefinition('app.default_backend', (new Definition(InMemoryBackend::class))->setPublic(true));
+        $container->setDefinition('app.default_context', (new Definition(InMemoryContext::class))->setPublic(true));
+        $container->setDefinition('app.audit_backend', (new Definition(InMemoryBackend::class))->setPublic(true));
+        $container->setDefinition('app.audit_context', (new Definition(InMemoryContext::class))->setPublic(true));
 
         (new StreamHubExtension())->load([[
             'backend_service' => 'app.default_backend',
@@ -95,6 +96,62 @@ final class StreamHubExtensionTest extends TestCase
             'stream_hub.instance.default.stream_hub',
             (string) $container->getAlias(StreamHubInterface::class)
         );
+    }
+
+    public function testNamedInstancesStayIsolatedByBackendAndState(): void
+    {
+        $container = new ContainerBuilder();
+        $container->setDefinition('app.default_backend', (new Definition(InMemoryBackend::class))->setPublic(true));
+        $container->setDefinition('app.default_context', (new Definition(InMemoryContext::class))
+            ->setPublic(true)
+            ->setArguments(['user-1', ['display_name' => 'Alice']]));
+        $container->setDefinition('app.audit_backend', (new Definition(InMemoryBackend::class))->setPublic(true));
+        $container->setDefinition('app.audit_context', (new Definition(InMemoryContext::class))
+            ->setPublic(true)
+            ->setArguments(['user-2', ['display_name' => 'Bob']]));
+
+        (new StreamHubExtension())->load([[
+            'backend_service' => 'app.default_backend',
+            'context_service' => 'app.default_context',
+            'id_generators' => [
+                'stream-lifecycle' => [
+                    'system_event_id' => 'uuid_v7',
+                ],
+            ],
+            'instances' => [
+                'audit' => [
+                    'backend_service' => 'app.audit_backend',
+                    'context_service' => 'app.audit_context',
+                    'id_generators' => [
+                        'stream-lifecycle' => [
+                            'system_event_id' => 'uuid_v7',
+                        ],
+                    ],
+                ],
+            ],
+        ]], $container);
+
+        $container->getDefinition(StreamHubRegistry::class)->setPublic(true);
+        $container->compile();
+
+        /** @var StreamHubRegistry $registry */
+        $registry = $container->get(StreamHubRegistry::class);
+        $registry->get()->dispatch(new StartStreamCommand(contextId: 'default-stream'));
+        $registry->get('audit')->dispatch(new StartStreamCommand(contextId: 'audit-stream'));
+
+        /** @var InMemoryBackend $defaultBackend */
+        $defaultBackend = $container->get('app.default_backend');
+        /** @var InMemoryBackend $auditBackend */
+        $auditBackend = $container->get('app.audit_backend');
+
+        $this->assertSame(1, $defaultBackend->streamCount());
+        $this->assertSame(1, $auditBackend->streamCount());
+        $this->assertNotNull($defaultBackend->getStream(new InMemoryContext('user-1'), 'default-stream'));
+        $this->assertNull($defaultBackend->getStream(new InMemoryContext('user-1'), 'audit-stream'));
+        $this->assertNotNull($auditBackend->getStream(new InMemoryContext('user-2'), 'audit-stream'));
+        $this->assertNull($auditBackend->getStream(new InMemoryContext('user-2'), 'default-stream'));
+        $this->assertSame(1, $defaultBackend->eventCountFor('default-stream'));
+        $this->assertSame(1, $auditBackend->eventCountFor('audit-stream'));
     }
 
     public function testItRegistersMessageComposerServicesForDefaultInstanceWhenGeneratorIsConfigured(): void
